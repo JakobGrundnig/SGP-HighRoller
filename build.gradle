@@ -1,0 +1,27 @@
+plugins {
+    id 'java'
+}
+
+group = 'highroller'
+version = '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.11
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation("com.gitlab.StrategyGameEngine:Strategy-Game-Engine:v1.0.7")
+}
+
+jar {
+    manifest {
+        attributes(
+                "Sge-Type": "agent",
+                "Agent-Class": "highroller/HighRollerAgent.java",
+                "Agent-Name": "HighRollerAgent"
+        )
+    }
+}
