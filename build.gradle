@@ -14,14 +14,16 @@ repositories {
 
 dependencies {
     implementation("com.gitlab.StrategyGameEngine:Strategy-Game-Engine:v1.0.7")
+    implementation 'junit:junit:4.13.1'
+    implementation 'org.junit.jupiter:junit-jupiter:5.8.1'
 }
 
 jar {
     manifest {
         attributes(
                 "Sge-Type": "agent",
-                "Agent-Class": "highroller/HighRollerAgent.java",
-                "Agent-Name": "HighRollerAgent"
+                "Agent-Class": "highroller.agents.FirstAgent",
+                "Agent-Name": "HighRoller"
         )
     }
 }
