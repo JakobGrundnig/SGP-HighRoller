@@ -12,6 +12,7 @@ public class FirstAgent<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
     public FirstAgent(Logger log) {
         super(log);
     }
+    // testing
 
     @Override
     public A computeNextAction(G game, long computationTime, TimeUnit timeUnit) {
