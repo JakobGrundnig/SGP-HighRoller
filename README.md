@@ -1,8 +1,5 @@
 # ReadMe
 ## Commands
-```bash
- cd .\src\main\java\highroller
-```
 **Agents:** \
 **Self-playing:** \
 RandomAgent \
