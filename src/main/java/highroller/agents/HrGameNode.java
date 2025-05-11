@@ -9,6 +9,7 @@ public class HrGameNode<A> implements GameNode<A> {
     private Game<A, ?> game;
     private int wins;
     private int plays;
+    private int score;
 
     public HrGameNode() {
         this(null);

@@ -1,15 +1,12 @@
 # ReadMe
 ## Commands
 **Agents:** \
-**Self-playing:** \
 RandomAgent \
-".\agents\sge-alphabetaagent-1.0.4.jar" \
-**Manual:** \
-".\agents\RiskAgent-1.0.4.jar" \
+RiskAgent \
+MCTSAgent \
 **match between 2 agents:**
 ```bash
-java -jar .\sge-1.0.7-exe.jar match --file=sge-risk-1.0.7-exe.jar --directory=agents --agent RandomAgent RandomAgent
-
+java -jar sge-1.0.7-exe.jar match --file=sge-risk-1.0.7-exe.jar --directory=agents --agent HighRoller RandomAgent --debug
 ```
 ## Build
 ```bash

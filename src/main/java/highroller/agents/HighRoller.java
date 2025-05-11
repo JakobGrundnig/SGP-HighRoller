@@ -180,7 +180,7 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
     private void expansion(Tree<HrGameNode<A>> tree) {
         if (tree.isLeaf()) {
             Game<A, ?> game = tree.getNode().getGame();
-            Set<A> possibleActions = game.getPossibleActions();
+            Set<A> possibleActions = game.getPossibleActions(); // Cull before expansion
             for (A possibleAction : possibleActions) {
                 tree.add(new HrGameNode<>(game, possibleAction));
             }
