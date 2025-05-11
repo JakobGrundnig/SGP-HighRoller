@@ -68,10 +68,10 @@ public class HrGameNode<A> implements GameNode<A> {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        HrGameNode<?> mcGameNode = (HrGameNode<?>) o;
-        return wins == mcGameNode.wins &&
-                plays == mcGameNode.plays &&
-                game.equals(mcGameNode.game);
+        HrGameNode<?> hrGameNode = (HrGameNode<?>) o;
+        return wins == hrGameNode.wins &&
+                plays == hrGameNode.plays &&
+                game.equals(hrGameNode.game);
     }
 
     @Override

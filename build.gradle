@@ -22,7 +22,7 @@ jar {
     manifest {
         attributes(
                 "Sge-Type": "agent",
-                "Agent-Class": "highroller.agents.FirstAgent",
+                "Agent-Class": "highroller.agents.HighRoller",
                 "Agent-Name": "HighRoller"
         )
     }
