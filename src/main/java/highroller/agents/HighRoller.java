@@ -18,7 +18,6 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
     private static double DEFAULT_EXPLOITATION_CONSTANT = Math.sqrt(2);
     private final double exploitationConstant;
     private final Tree<HrGameNode<A>> tree;
-    private double points; // Calculate current score based on our troups and enemy's troups
 
     private Comparator<Tree<HrGameNode<A>>> gameTreeUCTComparator;
     private Comparator<Tree<HrGameNode<A>>> gameTreeSelectionComparator;
@@ -73,7 +72,7 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
 
     }
 
-        @Override
+    @Override
     public A computeNextAction(G game, long computationTime, TimeUnit timeUnit) {
         log.debug("computeNextAction");
         super.setTimers(computationTime, timeUnit);
@@ -114,7 +113,7 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
 
             if (printThreshold < MAX_PRINT_THRESHOLD) {
                 printThreshold = Math.max(1, Math.min(MAX_PRINT_THRESHOLD,
-                        Math.round(tree.getNode().getPlays() * 11.1111111111F))); // TODO ?!?!
+                        Math.round(tree.getNode().getPlays() * 11.1111111111F)));
 
             }
         }
@@ -180,7 +179,7 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
     private void expansion(Tree<HrGameNode<A>> tree) {
         if (tree.isLeaf()) {
             Game<A, ?> game = tree.getNode().getGame();
-            Set<A> possibleActions = game.getPossibleActions(); // Cull before expansion
+            Set<A> possibleActions = game.getPossibleActions(); // TODO: Cull before expansion
             for (A possibleAction : possibleActions) {
                 tree.add(new HrGameNode<>(game, possibleAction));
             }
@@ -193,7 +192,7 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
             int simulationsLeft = simulationsAtLeast - simulationsDone;
             return simulation(tree, nanosLeft() / simulationsLeft);
         } else if (simulationsDone == 0) {
-            return simulation(tree, TIMEOUT / 2L - nanosElapsed()); // TODO 2L ?
+            return simulation(tree, TIMEOUT / 2L - nanosElapsed());
         }
 
         return simulation(tree);
@@ -240,7 +239,7 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         boolean win = score == 1D;
         boolean tie = score > 0;
 
-        win = win || (tie && random.nextBoolean()); // If win != null, win = (tie && random Boolean) // TODO ?
+        win = win || (tie && random.nextBoolean()); // If win != null, win = (tie && random Boolean)
         return win;
     }
 
@@ -249,7 +248,7 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         while (!tree.isRoot() && (depth++ % 31 != 0 || !shouldStopComputation())) {
             tree = tree.getParent();
             tree.getNode().incPlays();
-            // TODO change points
+            // TODO change additional heuristics
             if (win) {
                 tree.getNode().incWins();
             }

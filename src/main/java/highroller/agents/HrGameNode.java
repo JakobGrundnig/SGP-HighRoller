@@ -9,7 +9,7 @@ public class HrGameNode<A> implements GameNode<A> {
     private Game<A, ?> game;
     private int wins;
     private int plays;
-    private int score;
+    private int score; // calculate score based on own/enemy Troops & Territories
 
     public HrGameNode() {
         this(null);
