@@ -14,7 +14,6 @@ import at.ac.tuwien.ifs.sge.util.tree.Tree;
 public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A> implements GameAgent<G, A> {
     private static int INSTANCE_NR_COUNTER = 1;
     private static final int MAX_PRINT_THRESHOLD = 97;
-    private final Logger log = null;
     private final int instanceNr;
     private static double DEFAULT_EXPLOITATION_CONSTANT = Math.sqrt(2);
     private final double exploitationConstant;
@@ -33,7 +32,6 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
     private Comparator<Tree<HrGameNode<A>>> gameTreeGameComparator;
 
 
-
     public HighRoller() {
         this(null);
     }
@@ -49,7 +47,6 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
 
     @Override
     public void setUp(int numberOfPlayers, int playerId) {
-        log.debug("setUp");
         super.setUp(numberOfPlayers, playerId);
         tree.clear();
         tree.setNode(new HrGameNode<>());
@@ -68,6 +65,8 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         gameTreeGameComparator = (Tree<HrGameNode<A>> o1, Tree<HrGameNode<A>> o2) -> gameNodeGameComparator
                 .compare(o1.getNode(), o2.getNode());
 
+        gameTreeSelectionComparator = gameTreeUCTComparator.thenComparing(gameTreeGameComparator);
+
         gameNodeMoveComparator = gameNodePlayComparator.thenComparing(gameNodeWinComparator).thenComparing(gameNodeGameComparator);
         gameTreeMoveComparator = (Tree<HrGameNode<A>> o1, Tree<HrGameNode<A>> o2) -> gameNodeMoveComparator
                 .compare(o1.getNode(), o2.getNode());
@@ -79,17 +78,23 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         log.debug("computeNextAction");
         super.setTimers(computationTime, timeUnit);
 
+        log.tra_("Searching for root of tree");
         boolean foundRoot = Util.findRoot(tree, game); // search for current gamestate in existing tree
         if (foundRoot) {
+            log._trace(", done.");
             // TODO set node to root?
+        } else {
+            log._trace(", failed.");
         }
 
-        log.tra_("Check if best move will eventually end game: ");
+
+            log.tra_("Check if best move will eventually end game: ");
         if (sortPromisingCandidates(tree, gameNodeMoveComparator.reversed())) {
             log._trace("Yes");
             return Collections.max(tree.getChildren(), gameTreeMoveComparator).getNode().getGame()
                     .getPreviousAction();
         }
+        log._trace("No");
         int looped = 0;
 
         log.debugf("MCTS with %d simulations at confidence %.1f%%", tree.getNode().getPlays(),
