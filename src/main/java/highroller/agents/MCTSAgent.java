@@ -202,12 +202,66 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
             } else {
                 Set<A> actions = game.getPossibleActions();
                 if (actions.isEmpty()) break;
-                game = game.doAction(Util.selectRandom(actions, random));
+                
+                // Use victory likelihood for Risk games
+                if (game instanceof Risk) {
+                    game = game.doAction(selectActionWithVictoryLikelihood((Risk)game, actions));
+                } else {
+                    game = game.doAction(Util.selectRandom(actions, random));
+                }
             }
             depth++;
         }
         
         return hasWon(game);
+    }
+
+    /**
+     * Selects an action based on victory likelihood for Risk games.
+     * Uses a UCT-like formula to balance exploration and exploitation.
+     * @param game Current Risk game state
+     * @param actions Set of possible actions
+     * @return Selected action
+     */
+    @SuppressWarnings("unchecked")
+    private A selectActionWithVictoryLikelihood(Risk game, Set<A> actions) {
+        List<A> actionList = new ArrayList<>(actions);
+        List<Double> likelihoods = new ArrayList<>();
+        List<Integer> visits = new ArrayList<>();
+        double totalVisits = 0.0;
+
+        // Initialize visits and calculate initial likelihoods
+        for (A action : actionList) {
+            Risk nextGame = (Risk) game.doAction((at.ac.tuwien.ifs.sge.game.risk.board.RiskAction) action);
+            RiskMetricsCalculator calculator = new RiskMetricsCalculator(nextGame, playerId);
+            double likelihood = calculator.getVictoryLikelihood();
+            likelihoods.add(likelihood);
+            visits.add(1); // Start with 1 visit to avoid division by zero
+            totalVisits += 1;
+        }
+
+        // Use UCT-like formula to select action
+        double bestScore = Double.NEGATIVE_INFINITY;
+        A bestAction = null;
+        
+        for (int i = 0; i < actionList.size(); i++) {
+            // UCT formula: exploitation term + exploration term
+            double exploitation = likelihoods.get(i);
+            double exploration = exploitationConstant * Math.sqrt(Math.log(totalVisits) / visits.get(i));
+            double score = exploitation + exploration;
+            
+            if (score > bestScore) {
+                bestScore = score;
+                bestAction = actionList.get(i);
+            }
+        }
+        
+        // Update visit count for the selected action
+        int selectedIndex = actionList.indexOf(bestAction);
+        visits.set(selectedIndex, visits.get(selectedIndex) + 1);
+        totalVisits += 1;
+        
+        return bestAction;
     }
 
     /**
