@@ -11,6 +11,11 @@ import at.ac.tuwien.ifs.sge.util.Util;
 import at.ac.tuwien.ifs.sge.util.tree.DoubleLinkedTree;
 import at.ac.tuwien.ifs.sge.util.tree.Tree;
 
+/**
+ * HighRoller is an AI agent that uses Monte Carlo Tree Search (MCTS) to play Risk.
+ * It implements the UCT (Upper Confidence Bound for Trees) algorithm to make strategic decisions.
+ * The agent maintains a game tree of possible moves and uses simulation to evaluate their effectiveness.
+ */
 public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A> implements GameAgent<G, A> {
     private static int INSTANCE_NR_COUNTER = 1;
     private static final int MAX_PRINT_THRESHOLD = 97;
@@ -30,13 +35,27 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
     private Comparator<HrGameNode<A>> gameNodeGameComparator;
     private Comparator<Tree<HrGameNode<A>>> gameTreeGameComparator;
 
-
+    /**
+     * Default constructor for HighRoller agent.
+     * Creates a new instance with default exploitation constant.
+     */
     public HighRoller() {
         this(null);
     }
+
+    /**
+     * Creates a HighRoller agent with specified logger.
+     * @param log Logger instance for debugging and tracing
+     */
     public HighRoller(Logger log) {
         this(DEFAULT_EXPLOITATION_CONSTANT, log);
     }
+
+    /**
+     * Creates a HighRoller agent with custom exploitation constant and logger.
+     * @param exploitationConstant The exploration-exploitation balance parameter
+     * @param log Logger instance for debugging and tracing
+     */
     public HighRoller(double exploitationConstant, Logger log) {
         super(log);
         this.exploitationConstant = exploitationConstant;
@@ -44,6 +63,12 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         tree = new DoubleLinkedTree<>();
     }
 
+    /**
+     * Initializes the agent for a new game.
+     * Sets up the game tree and initializes all necessary comparators for tree operations.
+     * @param numberOfPlayers Total number of players in the game
+     * @param playerId The ID of this agent's player
+     */
     @Override
     public void setUp(int numberOfPlayers, int playerId) {
         super.setUp(numberOfPlayers, playerId);
@@ -72,6 +97,15 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
 
     }
 
+    /**
+     * Computes the next action to take in the game using MCTS.
+     * This is the main decision-making method that runs the MCTS algorithm
+     * to find the best move within the given computation time.
+     * @param game Current game state
+     * @param computationTime Maximum time allowed for computation
+     * @param timeUnit Unit of time for computation limit
+     * @return The best action to take
+     */
     @Override
     public A computeNextAction(G game, long computationTime, TimeUnit timeUnit) {
         log.debug("computeNextAction");
@@ -141,6 +175,12 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
                 .getPreviousAction();
     }
 
+    /**
+     * Sorts promising candidates in the game tree to quickly identify winning moves.
+     * @param tree Current game tree
+     * @param comparator Comparator used for sorting nodes
+     * @return true if a determined winning path is found, false otherwise
+     */
     private boolean sortPromisingCandidates(Tree<HrGameNode<A>> tree, Comparator<HrGameNode<A>> comparator) {
        boolean isDetermined = true;
        while (!tree.isLeaf() && isDetermined) {
@@ -156,6 +196,12 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
        return isDetermined && tree.getNode().getGame().isGameOver();
     }
 
+    /**
+     * Selection phase of MCTS.
+     * Traverses the tree from root to leaf using UCT formula to select promising nodes.
+     * @param tree Current game tree
+     * @return Selected leaf node for expansion
+     */
     private Tree<HrGameNode<A>> selection(Tree<HrGameNode<A>> tree) {
         int depth = 0;
         while (!tree.isLeaf() && (depth++ % 31 != 0 || !shouldStopComputation())) {
@@ -175,7 +221,11 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         return tree;
     }
 
-    // Add all possible nodes to the leaf node
+    /**
+     * Expansion phase of MCTS.
+     * Adds all possible child nodes to the selected leaf node.
+     * @param tree Leaf node to expand
+     */
     private void expansion(Tree<HrGameNode<A>> tree) {
         if (tree.isLeaf()) {
             Game<A, ?> game = tree.getNode().getGame();
@@ -186,6 +236,14 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         }
     }
 
+    /**
+     * Simulation phase of MCTS.
+     * Runs a random playout from the given node to determine the outcome.
+     * @param tree Node to simulate from
+     * @param simulationsAtLeast Minimum number of simulations to perform
+     * @param proportion Time proportion for simulation
+     * @return true if the simulation resulted in a win, false otherwise
+     */
     private boolean simulation(Tree<HrGameNode<A>> tree, int simulationsAtLeast, int proportion) {
         int simulationsDone = tree.getNode().getPlays();
         if (simulationsDone < simulationsAtLeast && shouldStopComputation(proportion)) {
@@ -198,6 +256,11 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         return simulation(tree);
     }
 
+    /**
+     * Performs a single simulation from the given node.
+     * @param tree Node to simulate from
+     * @return true if the simulation resulted in a win, false otherwise
+     */
     private boolean simulation(Tree<HrGameNode<A>> tree) {
         Game <A, ?> game = tree.getNode().getGame();
 
@@ -213,6 +276,12 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         return hasWon(game);
     }
 
+    /**
+     * Performs a time-limited simulation from the given node.
+     * @param tree Node to simulate from
+     * @param timeout Maximum time allowed for simulation
+     * @return true if the simulation resulted in a win, false otherwise
+     */
     private boolean simulation(Tree<HrGameNode<A>> tree, long timeout) {
         long startTime = System.nanoTime();
         Game<A, ?> game = tree.getNode().getGame();
@@ -228,6 +297,11 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         return hasWon(game);
     }
 
+    /**
+     * Determines if the given game state is a winning state for this agent.
+     * @param game Game state to evaluate
+     * @return true if the game state is a win, false otherwise
+     */
     private boolean hasWon(Game<A, ?> game) {
         double[] evaluation = game.getGameUtilityValue(); // TODO ?
         double score = Util.scoreOutOfUtility(evaluation, playerId);
@@ -243,6 +317,12 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         return win;
     }
 
+    /**
+     * Backpropagation phase of MCTS.
+     * Updates the statistics of all nodes along the path from leaf to root.
+     * @param tree Leaf node to start backpropagation from
+     * @param win Whether the simulation resulted in a win
+     */
     private void backpropagation(Tree<HrGameNode<A>> tree, boolean win) {
         int depth = 0;
         while (!tree.isRoot() && (depth++ % 31 != 0 || !shouldStopComputation())) {
@@ -255,6 +335,13 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         }
     }
 
+    /**
+     * Calculates the Upper Confidence Bound (UCB) value for a node.
+     * This is used in the UCT formula to balance exploration and exploitation.
+     * @param tree Node to calculate UCB for
+     * @param c Exploration constant
+     * @return UCB value for the node
+     */
     private double upperConfidenceBound(Tree<HrGameNode<A>> tree, double c) {
         double w = tree.getNode().getPlays();
         double n = Math.max(tree.getNode().getPlays(), 1);
@@ -266,30 +353,46 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         return (w / n) + c * Math.sqrt(Math.log(N) / n);
     }
 
+    /**
+     * Cleans up resources when the agent is no longer needed.
+     */
     @Override
     public void tearDown() {
         log.debug("tearDown");
         HighRoller.super.tearDown();
     }
 
+    /**
+     * Starts the pondering phase where the agent can think about moves in advance.
+     */
     @Override
     public void ponderStart() {
         log.debug("ponderStart");
         HighRoller.super.ponderStart();
     }
 
+    /**
+     * Stops the pondering phase.
+     */
     @Override
     public void ponderStop() {
         log.debug("ponderStop");
         HighRoller.super.ponderStop();
     }
 
+    /**
+     * Destroys the agent and cleans up all resources.
+     */
     @Override
     public void destroy() {
         log.debug("destroy");
         HighRoller.super.destroy();
     }
 
+    /**
+     * Returns a string representation of the agent.
+     * @return String representation of the agent
+     */
     public String toString() {
         if (instanceNr > 1 || HighRoller.INSTANCE_NR_COUNTER > 2) {
             return String.format("%s%d", "HighRoller#", instanceNr);
