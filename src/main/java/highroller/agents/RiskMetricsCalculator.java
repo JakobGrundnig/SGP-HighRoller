@@ -4,6 +4,7 @@ import at.ac.tuwien.ifs.sge.game.risk.board.Risk;
 import at.ac.tuwien.ifs.sge.game.risk.board.RiskBoard;
 import at.ac.tuwien.ifs.sge.game.risk.board.RiskTerritory;
 import at.ac.tuwien.ifs.sge.game.risk.board.RiskContinent;
+import at.ac.tuwien.ifs.sge.engine.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 public class RiskMetricsCalculator {
     private final RiskBoard board;
     private final int playerId;
+    private final Logger log;
     
     // Cache frequently accessed data
     private final Map<Integer, RiskTerritory> territories;
@@ -31,12 +33,29 @@ public class RiskMetricsCalculator {
      * Creates a new RiskMetricsCalculator for the specified game state and player.
      * @param game The current Risk game state
      * @param playerId The ID of the player to calculate metrics for
+     * @param log Logger instance for debugging
      */
-    public RiskMetricsCalculator(Risk game, int playerId) {
+    public RiskMetricsCalculator(Risk game, int playerId, Logger log) {
+        if (game == null) {
+            throw new IllegalArgumentException("Game cannot be null");
+        }
+        if (playerId < 0) {
+            throw new IllegalArgumentException("Player ID must be non-negative");
+        }
+        
         this.board = game.getBoard();
+        if (this.board == null) {
+            throw new IllegalStateException("Game board cannot be null");
+        }
+        
         this.playerId = playerId;
+        this.log = log;
         this.territories = board.getTerritories();
         this.continents = board.getContinents();
+        
+        if (this.territories == null || this.continents == null) {
+            throw new IllegalStateException("Board territories or continents cannot be null");
+        }
         
         // Pre-calculate player territories for faster access
         this.playerTerritories = territories.entrySet().stream()
@@ -95,6 +114,10 @@ public class RiskMetricsCalculator {
      */
     public double getAttackPotential(int territoryId) {
         RiskTerritory territory = territories.get(territoryId);
+        if (territory == null) {
+            return 0.0;
+        }
+        
         if (territory.getOccupantPlayerId() != playerId) {
             return 0.0;
         }
@@ -113,6 +136,10 @@ public class RiskMetricsCalculator {
         double totalPotential = 0.0;
         for (int neighborId : neighbors) {
             RiskTerritory neighbor = territories.get(neighborId);
+            if (neighbor == null) {
+                continue;
+            }
+            
             int defenderTroops = neighbor.getTroops();
             
             // Calculate attack potential based on troop ratio
@@ -230,7 +257,7 @@ public class RiskMetricsCalculator {
         double attackPotential = getOverallAttackPotential();
 
         // Weight the metrics, emphasizing attack potential
-        double[] weights = {0.3, 0.3, 0.2, 0.2}; // Increased weight for attack potential
+        double[] weights = {0.2, 0.4, 0.1, 0.3}; // Increased weight for attack potential
         double[] metrics = {territoryScore, troopScore, continentScore, attackPotential};
 
         // Calculate weighted sum
@@ -239,6 +266,11 @@ public class RiskMetricsCalculator {
             score += weights[i] * metrics[i];
         }
 
+        log.trace("Game state score: " + score + 
+                 " (territory: " + territoryScore + 
+                 ", troops: " + troopScore + 
+                 ", continent: " + continentScore + 
+                 ", attack: " + attackPotential + ")");
         return score;
     }
 

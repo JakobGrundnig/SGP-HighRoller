@@ -50,7 +50,7 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
     @Override
     public void setUp(int numberOfPlayers, int playerId) {
         super.setUp(numberOfPlayers, playerId);
-        mctsAgent = new MCTSAgent<>(DEFAULT_EXPLOITATION_CONSTANT, playerId);
+        mctsAgent = new MCTSAgent<>(DEFAULT_EXPLOITATION_CONSTANT, playerId, log);
         mctsAgent.setUp();
     }
 

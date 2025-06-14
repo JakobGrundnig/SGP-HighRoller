@@ -32,6 +32,53 @@ http://www.datagenetics.com/blog/november22011/index.html
 Strategy: \
 https://web.mit.edu/sp.268/www/risk.pdf
 
-#
+## Agent Flow
+### HighRoller - computeNextAction
+- MCTSAgent - sortPromisingCandidates
+  - check for Actions that end the game
+- while not shouldStopComputation()
+  - MCTSAgent
+    - select
+    - expand
+    - simulate
+    - backpropagate
+  - return bestAction
 
+### MCTSAgent 
+  - sortPromisingCandidates
+    - calculate and save GameStateScore for each candidate
+    - sort by GameStateScore (TerritoryScore, TroopScore, ContinentScore, AttackPotential)
+    - tree = getBestChild
+  - selection
+    - while not Leaf and not shouldStopComputation
+      - tree = max(children, gameTreeSelectionComparator)
+  - expansion
+    - add all possible actions as child nodes to tree
+  - simulation
+    - while not game is over AND depth < max_depth AND not shouldStopComputation
+      - selectActionWithHighestGameStateScore
+  - backpropagation
+    - Incline Plays and Wins
 
+  - selectActionWithHighestGameStateScore
+    - for all possible actions
+      - check or set GameStateScore
+      - UCT
+        - Exploitation is based on GameStateScore
+        - Exploration is based on visits
+      - return bestAction
+  - hasWon
+    - return 1 if win OR UtilityScore && random.nextBoolean if tie
+
+### RiskMetricsCalculator
+  - GameStateScore
+    - territoryScore = myTerritories / totalTerritories
+    - troopScore = myTroops / totalTroops
+    - continentScore = per Continent: 
+      - myTerritories / totalTerritories) / continentCount
+    - attackPotential = Per owned Territory:
+      - 1 if myTroop/enemyTroop ratio >= 2
+      - 0.8 if myTroops >= enemyTroops + 5
+      - 0.3 if ratio >= 1
+      - 0.1 else
+      - divided by bordering enemy Territories
