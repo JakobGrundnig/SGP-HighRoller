@@ -6,6 +6,7 @@ import at.ac.tuwien.ifs.sge.game.risk.board.RiskTerritory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Utility class for calculating various game metrics for Risk AI agents.
@@ -131,18 +132,98 @@ public class RiskMetricsCalculator {
     }
 
     /**
-     * Calculates an overall victory likelihood score
-     * @return score between 0 and 1
+     * Calculates the attack potential of a territory.
+     * Favors territories with superior numbers against neighbors.
+     * @param territoryId The territory to evaluate
+     * @return A score between 0 and 1 indicating attack potential
+     */
+    public double getAttackPotential(int territoryId) {
+        RiskTerritory territory = board.getTerritories().get(territoryId);
+        if (territory.getOccupantPlayerId() != playerId) {
+            return 0.0;
+        }
+
+        int attackerTroops = territory.getTroops();
+        if (attackerTroops <= 1) {
+            return 0.0; // Can't attack with 1 troop
+        }
+
+        double totalPotential = 0.0;
+        int validTargets = 0;
+
+        // Get neighboring enemy territories
+        Set<Integer> neighbors = board.neighboringEnemyTerritories(territoryId);
+        for (int neighborId : neighbors) {
+            RiskTerritory neighbor = board.getTerritories().get(neighborId);
+            int defenderTroops = neighbor.getTroops();
+            
+            // Calculate attack potential based on troop ratio
+            double troopRatio = (double) attackerTroops / defenderTroops;
+            
+            // Apply aggressive strategy rules:
+            // 1. Strongly favor superior numbers (2:1 or better)
+            // 2. Require at least 5 troops for equal numbers
+            // 3. Penalize attacks with inferior numbers
+            double potential;
+            if (troopRatio >= 2.0) {
+                potential = 1.0; // Ideal situation
+            } else if (troopRatio >= 1.0) {
+                // For equal or slightly superior numbers, require minimum troops
+                potential = attackerTroops >= 5 ? 0.8 : 0.3;
+            } else {
+                potential = 0.1; // Discourage attacks with inferior numbers
+            }
+            
+            totalPotential += potential;
+            validTargets++;
+        }
+
+        return validTargets > 0 ? totalPotential / validTargets : 0.0;
+    }
+
+    /**
+     * Calculates the overall attack potential for the player.
+     * @return A score between 0 and 1 indicating overall attack potential
+     */
+    public double getOverallAttackPotential() {
+        double totalPotential = 0.0;
+        int validTerritories = 0;
+
+        for (Map.Entry<Integer, RiskTerritory> entry : board.getTerritories().entrySet()) {
+            if (entry.getValue().getOccupantPlayerId() == playerId) {
+                double potential = getAttackPotential(entry.getKey());
+                if (potential > 0) {
+                    totalPotential += potential;
+                    validTerritories++;
+                }
+            }
+        }
+
+        return validTerritories > 0 ? totalPotential / validTerritories : 0.0;
+    }
+
+    /**
+     * Calculates the victory likelihood with emphasis on aggressive play.
+     * @return A score between 0 and 1 indicating victory likelihood
      */
     public double getVictoryLikelihood() {
+        // Get base metrics
         double territoryScore = (double) getTerritoryCount() / board.getTerritories().size();
         double troopScore = (double) getTotalTroopStrength() / getTotalGameTroops();
         double continentScore = calculateContinentScore();
-        
-        // Weighted combination of different factors (rebalanced without missionScore)
-        return (0.4 * territoryScore) + 
-               (0.4 * troopScore) + 
-               (0.2 * continentScore);
+        double attackPotential = getOverallAttackPotential();
+
+        // Weight the metrics, emphasizing attack potential
+        double[] weights = {0.3, 0.3, 0.2, 0.2}; // Increased weight for attack potential
+        double[] metrics = {territoryScore, troopScore, continentScore, attackPotential};
+
+        // Calculate weighted sum
+        double score = 0.0;
+        for (int i = 0; i < weights.length; i++) {
+            score += weights[i] * metrics[i];
+        }
+
+        return score;
     }
 
     private int getTotalGameTroops() {
