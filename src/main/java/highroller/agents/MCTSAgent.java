@@ -5,12 +5,9 @@ import at.ac.tuwien.ifs.sge.util.Util;
 import at.ac.tuwien.ifs.sge.util.tree.DoubleLinkedTree;
 import at.ac.tuwien.ifs.sge.util.tree.Tree;
 import at.ac.tuwien.ifs.sge.game.risk.board.Risk;
-import at.ac.tuwien.ifs.sge.game.risk.board.RiskBoard;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-
-import highroller.agents.RiskMetricsCalculator;
 
 /**
  * MCTSAgent provides the core Monte Carlo Tree Search functionality.
@@ -115,7 +112,7 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
                 tree.getChildren().sort((c1, c2) -> {
                     RiskMetricsCalculator calc1 = new RiskMetricsCalculator((Risk) c1.getNode().getGame(), playerId);
                     RiskMetricsCalculator calc2 = new RiskMetricsCalculator((Risk) c2.getNode().getGame(), playerId);
-                    return Double.compare(calc2.getVictoryLikelihood(), calc1.getVictoryLikelihood());
+                    return Double.compare(calc2.getGameStateScore(), calc1.getGameStateScore());
                 });
             } else if (tree.getNode().getGame().getCurrentPlayer() == playerId) {
                 tree.sort(comparator);
@@ -234,7 +231,7 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
         for (A action : actionList) {
             Risk nextGame = (Risk) game.doAction((at.ac.tuwien.ifs.sge.game.risk.board.RiskAction) action);
             RiskMetricsCalculator calculator = new RiskMetricsCalculator(nextGame, playerId);
-            double likelihood = calculator.getVictoryLikelihood();
+            double likelihood = calculator.getGameStateScore();
             likelihoods.add(likelihood);
             visits.add(1); // Start with 1 visit to avoid division by zero
             totalVisits += 1;
