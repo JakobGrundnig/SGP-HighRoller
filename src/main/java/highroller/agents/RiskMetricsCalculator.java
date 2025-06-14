@@ -8,6 +8,7 @@ import at.ac.tuwien.ifs.sge.game.risk.board.RiskContinent;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * RiskMetricsCalculator provides methods to evaluate game states and calculate various metrics
@@ -17,6 +18,14 @@ import java.util.Set;
 public class RiskMetricsCalculator {
     private final RiskBoard board;
     private final int playerId;
+    
+    // Cache frequently accessed data
+    private final Map<Integer, RiskTerritory> territories;
+    private final Map<Integer, RiskContinent> continents;
+    private final Set<Integer> playerTerritories;
+    private int totalGameTroops = -1;
+    private int playerTroops = -1;
+    private int playerTerritoryCount = -1;
 
     /**
      * Creates a new RiskMetricsCalculator for the specified game state and player.
@@ -26,6 +35,14 @@ public class RiskMetricsCalculator {
     public RiskMetricsCalculator(Risk game, int playerId) {
         this.board = game.getBoard();
         this.playerId = playerId;
+        this.territories = board.getTerritories();
+        this.continents = board.getContinents();
+        
+        // Pre-calculate player territories for faster access
+        this.playerTerritories = territories.entrySet().stream()
+                .filter(e -> e.getValue().getOccupantPlayerId() == playerId)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -33,9 +50,10 @@ public class RiskMetricsCalculator {
      * @return The number of territories owned by the player
      */
     public int getTerritoryCount() {
-        return (int) board.getTerritories().values().stream()
-                .filter(t -> t.getOccupantPlayerId() == playerId)
-                .count();
+        if (playerTerritoryCount == -1) {
+            playerTerritoryCount = playerTerritories.size();
+        }
+        return playerTerritoryCount;
     }
 
     /**
@@ -43,9 +61,12 @@ public class RiskMetricsCalculator {
      * @return The total number of troops in the game
      */
     public int getTotalGameTroops() {
-        return board.getTerritories().values().stream()
-                .mapToInt(RiskTerritory::getTroops)
-                .sum();
+        if (totalGameTroops == -1) {
+            totalGameTroops = territories.values().stream()
+                    .mapToInt(RiskTerritory::getTroops)
+                    .sum();
+        }
+        return totalGameTroops;
     }
 
     /**
@@ -53,10 +74,12 @@ public class RiskMetricsCalculator {
      * @return The total number of troops owned by the player
      */
     public int getTotalTroopStrength() {
-        return board.getTerritories().values().stream()
-                .filter(t -> t.getOccupantPlayerId() == playerId)
-                .mapToInt(RiskTerritory::getTroops)
-                .sum();
+        if (playerTroops == -1) {
+            playerTroops = playerTerritories.stream()
+                    .mapToInt(id -> territories.get(id).getTroops())
+                    .sum();
+        }
+        return playerTroops;
     }
 
     /**
@@ -71,7 +94,7 @@ public class RiskMetricsCalculator {
      * @return A score between 0 and 1 indicating attack potential
      */
     public double getAttackPotential(int territoryId) {
-        RiskTerritory territory = board.getTerritories().get(territoryId);
+        RiskTerritory territory = territories.get(territoryId);
         if (territory.getOccupantPlayerId() != playerId) {
             return 0.0;
         }
@@ -81,13 +104,15 @@ public class RiskMetricsCalculator {
             return 0.0; // Can't attack with 1 troop
         }
 
-        double totalPotential = 0.0;
-        int validTargets = 0;
-
         // Get neighboring enemy territories
         Set<Integer> neighbors = board.neighboringEnemyTerritories(territoryId);
+        if (neighbors.isEmpty()) {
+            return 0.0;
+        }
+
+        double totalPotential = 0.0;
         for (int neighborId : neighbors) {
-            RiskTerritory neighbor = board.getTerritories().get(neighborId);
+            RiskTerritory neighbor = territories.get(neighborId);
             int defenderTroops = neighbor.getTroops();
             
             // Calculate attack potential based on troop ratio
@@ -105,10 +130,9 @@ public class RiskMetricsCalculator {
             }
             
             totalPotential += potential;
-            validTargets++;
         }
 
-        return validTargets > 0 ? totalPotential / validTargets : 0.0;
+        return totalPotential / neighbors.size();
     }
 
     /**
@@ -119,16 +143,18 @@ public class RiskMetricsCalculator {
      * @return A score between 0 and 1 indicating overall attack potential
      */
     public double getOverallAttackPotential() {
+        if (playerTerritories.isEmpty()) {
+            return 0.0;
+        }
+
         double totalPotential = 0.0;
         int validTerritories = 0;
 
-        for (Map.Entry<Integer, RiskTerritory> entry : board.getTerritories().entrySet()) {
-            if (entry.getValue().getOccupantPlayerId() == playerId) {
-                double potential = getAttackPotential(entry.getKey());
-                if (potential > 0) {
-                    totalPotential += potential;
-                    validTerritories++;
-                }
+        for (int territoryId : playerTerritories) {
+            double potential = getAttackPotential(territoryId);
+            if (potential > 0) {
+                totalPotential += potential;
+                validTerritories++;
             }
         }
 
@@ -143,28 +169,41 @@ public class RiskMetricsCalculator {
      * @return A score between 0 and 1 indicating continent control potential
      */
     private double calculateContinentScore() {
+        if (continents.isEmpty()) {
+            return 0.0;
+        }
+
         double totalScore = 0.0;
         int continentCount = 0;
 
-        for (Map.Entry<Integer, RiskContinent> entry : board.getContinents().entrySet()) {
+        // Pre-calculate territory counts per continent for the player
+        Map<Integer, Integer> continentTerritoryCounts = new HashMap<>();
+        Map<Integer, Integer> playerContinentTerritoryCounts = new HashMap<>();
+
+        for (RiskTerritory territory : territories.values()) {
+            int continentId = territory.getContinentId();
+            continentTerritoryCounts.merge(continentId, 1, Integer::sum);
+            if (territory.getOccupantPlayerId() == playerId) {
+                playerContinentTerritoryCounts.merge(continentId, 1, Integer::sum);
+            }
+        }
+
+        for (Map.Entry<Integer, RiskContinent> entry : continents.entrySet()) {
             int continentId = entry.getKey();
             RiskContinent continent = entry.getValue();
             
-            // Count territories in this continent owned by the player
-            int totalTerritories = (int) board.getTerritories().values().stream()
-                    .filter(t -> t.getContinentId() == continentId)
-                    .count();
-            int playerTerritories = (int) board.getTerritories().values().stream()
-                    .filter(t -> t.getContinentId() == continentId && t.getOccupantPlayerId() == playerId)
-                    .count();
+            int totalTerritories = continentTerritoryCounts.getOrDefault(continentId, 0);
+            int playerTerritories = playerContinentTerritoryCounts.getOrDefault(continentId, 0);
             
-            // Calculate progress towards controlling the continent
-            double progress = (double) playerTerritories / totalTerritories;
-            
-            // Weight by continent bonus
-            double bonus = continent.getTroopBonus();
-            totalScore += progress * (bonus / 10.0); // Normalize bonus
-            continentCount++;
+            if (totalTerritories > 0) {
+                // Calculate progress towards controlling the continent
+                double progress = (double) playerTerritories / totalTerritories;
+                
+                // Weight by continent bonus
+                double bonus = continent.getTroopBonus();
+                totalScore += progress * (bonus / 10.0); // Normalize bonus
+                continentCount++;
+            }
         }
 
         return continentCount > 0 ? totalScore / continentCount : 0.0;
@@ -185,7 +224,7 @@ public class RiskMetricsCalculator {
      */
     public double getGameStateScore() {
         // Get base metrics
-        double territoryScore = (double) getTerritoryCount() / board.getTerritories().size();
+        double territoryScore = (double) getTerritoryCount() / territories.size();
         double troopScore = (double) getTotalTroopStrength() / getTotalGameTroops();
         double continentScore = calculateContinentScore();
         double attackPotential = getOverallAttackPotential();
