@@ -76,9 +76,6 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         }
         log._trace("No");
 
-        log.debugf("MCTS with %d simulations at confidence %.1f%%", mctsAgent.getTree().getNode().getPlays(),
-                Util.percentage(mctsAgent.getTree().getNode().getWins(), mctsAgent.getTree().getNode().getPlays()));
-
         while (!shouldStopComputation()) {
             Tree<HrGameNode<A>> currentTree = mctsAgent.getTree();
             currentTree = mctsAgent.selection(currentTree);
@@ -104,9 +101,10 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
             return Collections.max(game.getPossibleActions(),
                     (o1, o2) -> gameComparator.compare(game.doAction(o1), game.doAction(o2)));
         }
-
-        return Collections.max(mctsAgent.getTree().getChildren(), mctsAgent.getGameTreeMoveComparator()).getNode().getGame()
+        A bestAction = Collections.max(mctsAgent.getTree().getChildren(), mctsAgent.getGameTreeMoveComparator()).getNode().getGame()
                 .getPreviousAction();
+        log._debf("Best action: %s", bestAction);
+        return bestAction;
     }
 
     @Override
