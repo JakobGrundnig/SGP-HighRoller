@@ -253,12 +253,16 @@ public class RiskMetricsCalculator {
         // Get base metrics
         double territoryScore = (double) getTerritoryCount() / territories.size();
         double troopScore = (double) getTotalTroopStrength() / getTotalGameTroops();
-        double continentScore = calculateContinentScore();
-        double attackPotential = getOverallAttackPotential();
+//        double continentScore = calculateContinentScore();
+//        double attackPotential = getOverallAttackPotential();
 
         // Weight the metrics, emphasizing attack potential
-        double[] weights = {0.2, 0.4, 0.1, 0.3}; // Increased weight for attack potential
-        double[] metrics = {territoryScore, troopScore, continentScore, attackPotential};
+//        double[] weights = {0.2, 0.4, 0.1, 0.3}; // Increased weight for attack potential
+//        double[] metrics = {territoryScore, troopScore, continentScore, attackPotential};
+
+        // only territoryScore and troopScore
+        double[] weights = {0.4, 0.6}; // Increased weight for attack potential
+        double[] metrics = {territoryScore, troopScore};
 
         // Calculate weighted sum
         double score = 0.0;
@@ -266,11 +270,11 @@ public class RiskMetricsCalculator {
             score += weights[i] * metrics[i];
         }
 
-        log.trace("Game state score: " + score + 
-                 " (territory: " + territoryScore + 
-                 ", troops: " + troopScore + 
-                 ", continent: " + continentScore + 
-                 ", attack: " + attackPotential + ")");
+//        log.trace("Game state score: " + score +
+//                 " (territory: " + territoryScore +
+//                 ", troops: " + troopScore +
+//                 ", continent: " + continentScore +
+//                 ", attack: " + attackPotential + ")");
         return score;
     }
 
