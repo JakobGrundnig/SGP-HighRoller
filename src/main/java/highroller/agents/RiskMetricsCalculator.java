@@ -4,7 +4,6 @@ import at.ac.tuwien.ifs.sge.game.risk.board.Risk;
 import at.ac.tuwien.ifs.sge.game.risk.board.RiskBoard;
 import at.ac.tuwien.ifs.sge.game.risk.board.RiskTerritory;
 import at.ac.tuwien.ifs.sge.game.risk.board.RiskContinent;
-import at.ac.tuwien.ifs.sge.engine.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,9 +16,15 @@ import java.util.stream.Collectors;
  * overall game state quality.
  */
 public class RiskMetricsCalculator {
+
+    private final boolean[] CALCULATOR_CONFIG = {
+        true,  // Territory count
+        true,  // Troop strength
+        true,  // Continent control
+        true   // Attack potential
+    };
     private final RiskBoard board;
     private final int playerId;
-    private final Logger log;
     
     // Cache frequently accessed data
     private final Map<Integer, RiskTerritory> territories;
@@ -33,9 +38,8 @@ public class RiskMetricsCalculator {
      * Creates a new RiskMetricsCalculator for the specified game state and player.
      * @param game The current Risk game state
      * @param playerId The ID of the player to calculate metrics for
-     * @param log Logger instance for debugging
      */
-    public RiskMetricsCalculator(Risk game, int playerId, Logger log) {
+    public RiskMetricsCalculator(Risk game, int playerId) {
         if (game == null) {
             throw new IllegalArgumentException("Game cannot be null");
         }
@@ -49,7 +53,6 @@ public class RiskMetricsCalculator {
         }
         
         this.playerId = playerId;
-        this.log = log;
         this.territories = board.getTerritories();
         this.continents = board.getContinents();
         
@@ -250,32 +253,35 @@ public class RiskMetricsCalculator {
      * @return A score between 0 and 1 indicating overall game state quality
      */
     public double getGameStateScore() {
-        // Get base metrics
-        double territoryScore = (double) getTerritoryCount() / territories.size();
-        double troopScore = (double) getTotalTroopStrength() / getTotalGameTroops();
-//        double continentScore = calculateContinentScore();
-//        double attackPotential = getOverallAttackPotential();
-
-        // Weight the metrics, emphasizing attack potential
-//        double[] weights = {0.2, 0.4, 0.1, 0.3}; // Increased weight for attack potential
-//        double[] metrics = {territoryScore, troopScore, continentScore, attackPotential};
-
-        // only territoryScore and troopScore
-        double[] weights = {0.4, 0.6}; // Increased weight for attack potential
-        double[] metrics = {territoryScore, troopScore};
-
-        // Calculate weighted sum
         double score = 0.0;
-        for (int i = 0; i < weights.length; i++) {
-            score += weights[i] * metrics[i];
+        double weightSum = 0.0;
+
+        if (CALCULATOR_CONFIG[0]) {
+            double territoryScore = (double) getTerritoryCount() / board.getTerritories().size();
+            score += 0.2 * territoryScore;
+            weightSum += 0.2;
         }
 
-//        log.trace("Game state score: " + score +
-//                 " (territory: " + territoryScore +
-//                 ", troops: " + troopScore +
-//                 ", continent: " + continentScore +
-//                 ", attack: " + attackPotential + ")");
-        return score;
+        if (CALCULATOR_CONFIG[1]) {
+            double troopScore = (double) getTotalTroopStrength() / getTotalGameTroops();
+            score += 0.4 * troopScore;
+            weightSum += 0.4;
+        }
+
+        if (CALCULATOR_CONFIG[2]) {
+            double continentScore = calculateContinentScore();
+            score += 0.1 * continentScore;
+            weightSum += 0.1;
+        }
+
+        if (CALCULATOR_CONFIG[3]) {
+            double attackPotential = getOverallAttackPotential();
+            score += 0.3 * attackPotential;
+            weightSum += 0.3;
+        }
+
+        // Normalize the final score so it's always on a [0,1] scale
+        return weightSum > 0 ? score / weightSum : 0.0;
     }
 
     /**

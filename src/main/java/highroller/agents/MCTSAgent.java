@@ -1,6 +1,8 @@
 package highroller.agents;
 
 import at.ac.tuwien.ifs.sge.game.Game;
+import at.ac.tuwien.ifs.sge.game.risk.board.Risk;
+import at.ac.tuwien.ifs.sge.game.risk.board.RiskAction;
 import at.ac.tuwien.ifs.sge.util.Util;
 import at.ac.tuwien.ifs.sge.util.tree.DoubleLinkedTree;
 import at.ac.tuwien.ifs.sge.util.tree.Tree;
@@ -141,6 +143,7 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
     /**
      * Expansion phase of MCTS.
      * Adds all possible child nodes to the selected leaf node.
+     * Computes the game state score for Risk games if not already computed.
      * @param tree Leaf node to expand
      */
     public void expansion(Tree<HrGameNode<A>> tree) {
@@ -149,7 +152,16 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
             Set<A> possibleActions = game.getPossibleActions();
             for (A possibleAction : possibleActions) {
                 if (shouldStopComputation()) break;
-                tree.add(new HrGameNode<>(game, possibleAction));
+                // Apply action to get next state
+                Game<A, ?> nextGame = game.doAction(possibleAction);
+                HrGameNode<A> childNode = new HrGameNode<>(nextGame);
+                tree.add(childNode);
+
+                // Compute and store game state score if it's a Risk game
+                if (nextGame instanceof Risk && !childNode.hasGameStateScore()) {
+                    RiskMetricsCalculator calculator = new RiskMetricsCalculator((Risk) nextGame, playerId);
+                    childNode.setGameStateScore(calculator.getGameStateScore());
+                }
             }
         }
     }
@@ -159,14 +171,14 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
      * Runs a random playout from the given node to determine the outcome.
      * @param tree Node to simulate from
      * @param simulationsAtLeast Minimum number of simulations to perform
-     * @param proportion Time proportion for simulation
+     * @param buffer Time buffer for simulation
      * @return true if the simulation resulted in a win, false otherwise
      */
-    public boolean simulation(Tree<HrGameNode<A>> tree, int simulationsAtLeast, int proportion) {
+    public boolean simulation(Tree<HrGameNode<A>> tree, int simulationsAtLeast, double buffer) {
         if (shouldStopComputation()) return false;
 
         int simulationsDone = tree.getNode().getPlays();
-        if (simulationsDone < simulationsAtLeast && !shouldStopComputation(proportion)) {
+        if (simulationsDone < simulationsAtLeast && !shouldStopComputation(buffer)) {
             return simulation(tree);
         }
         return simulation(tree);
@@ -183,14 +195,29 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
         Game<A, ?> game = tree.getNode().getGame();
         int depth = 0;
 
-        while (!game.isGameOver() && depth < MAX_SIMULATION_DEPTH && !shouldStopComputation()) {
-            if (game.getCurrentPlayer() < 0) {
+        while (!game.isGameOver() && depth < MAX_SIMULATION_DEPTH) {
+            if (shouldStopComputation()) return false;
+
+            int currentPlayer = game.getCurrentPlayer();
+
+            // Skip inactive players
+            if (currentPlayer < 0) {
                 game = game.doAction();
-            } else {
-                Set<A> actions = game.getPossibleActions();
-                if (actions.isEmpty()) break;
-                game = game.doAction(Util.selectRandom(actions, random));
+                depth++;
+                continue;
             }
+
+            Set<A> actions = game.getPossibleActions();
+            if (actions.isEmpty()) break;
+
+            A selectedAction;
+            if (game instanceof Risk && depth < 10) {
+                selectedAction = selectActionWithHighestGameStateScore((Risk) game, actions);
+            } else {
+                selectedAction = Util.selectRandom(actions, random);
+            }
+
+            game = game.doAction(selectedAction);
             depth++;
         }
 
@@ -234,6 +261,37 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
             }
         }
     }
+    private A selectActionWithHighestGameStateScore(Risk game, Set<A> actions) {
+        A bestAction = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+
+        double totalVisits = actions.size(); // initial 1 visit per action
+        double logTotalVisits = Math.log(totalVisits);
+
+        for (A action : actions) {
+            // Generate the resulting game state
+            Risk nextGame = (Risk) game.doAction((RiskAction) action);
+
+            // Use or initialize node with game state score
+            HrGameNode<RiskAction> node = new HrGameNode<>(nextGame);
+            if (!node.hasGameStateScore()) {
+                RiskMetricsCalculator calculator = new RiskMetricsCalculator(nextGame, playerId);
+                node.setGameStateScore(calculator.getGameStateScore());
+            }
+
+            double exploitation = node.getGameStateScore();
+            double exploration = exploitationConstant * Math.sqrt(logTotalVisits); // visits = 1
+            double score = exploitation + exploration;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestAction = action;
+            }
+        }
+
+        return bestAction;
+    }
+
 
     /**
      * Calculates the Upper Confidence Bound (UCB) value for a node.
@@ -262,11 +320,12 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
 
     /**
      * Checks if computation should stop based on time constraints and proportion.
-     * @param proportion Time proportion to check against
+     * @param buffer Time buffer to not exceed the limit
      * @return true if computation should stop, false otherwise
      */
-    private boolean shouldStopComputation(int proportion) {
-        return (System.nanoTime() - START_TIME) * proportion >= TIMEOUT;
+    private boolean shouldStopComputation(double buffer) {
+        buffer *= 1_000_000; // Convert to nanoseconds
+        return (System.nanoTime() - START_TIME) - buffer >= TIMEOUT;
     }
 
     /**

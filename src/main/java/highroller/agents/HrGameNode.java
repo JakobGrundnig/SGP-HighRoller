@@ -9,24 +9,25 @@ public class HrGameNode<A> implements GameNode<A> {
     private Game<A, ?> game;
     private int wins;
     private int plays;
-    private int score; // calculate score based on own/enemy Troops & Territories
+    private double gameStateScore;
 
     public HrGameNode() {
         this(null);
     }
 
     public HrGameNode(Game<A, ?> game) {
-        this(game, 0, 0);
+        this(game, 0, 0, Double.NaN);
     }
 
     public HrGameNode(Game<A, ?> game, A action) {
         this(game.doAction(action));
     }
 
-    public HrGameNode(Game<A, ?> game, int wins, int plays) {
+    public HrGameNode(Game<A, ?> game, int wins, int plays, double gameStateScore) {
         this.game = game;
         this.wins = wins;
         this.plays = plays;
+        this.gameStateScore = gameStateScore;
     }
 
     public Game<A, ?> getGame() {
@@ -59,6 +60,18 @@ public class HrGameNode<A> implements GameNode<A> {
 
     public void incPlays() {
         plays++;
+    }
+
+    public double getGameStateScore() {
+        return gameStateScore;
+    }
+
+    public void setGameStateScore(double score) {
+        this.gameStateScore = score;
+    }
+
+    public boolean hasGameStateScore() {
+        return !Double.isNaN(gameStateScore);
     }
 
     @Override

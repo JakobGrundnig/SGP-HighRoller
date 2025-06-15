@@ -76,14 +76,12 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
         }
         log._trace("No");
 
-        log.debugf("MCTS with %d simulations at confidence %.1f%%", mctsAgent.getTree().getNode().getPlays(),
-                Util.percentage(mctsAgent.getTree().getNode().getWins(), mctsAgent.getTree().getNode().getPlays()));
 
         while (!shouldStopComputation()) {
             Tree<HrGameNode<A>> currentTree = mctsAgent.getTree();
             currentTree = mctsAgent.selection(currentTree);
             mctsAgent.expansion(currentTree);
-            boolean won = mctsAgent.simulation(currentTree, 128, 2);
+            boolean won = mctsAgent.simulation(currentTree, 128, 0.5);
             mctsAgent.backpropagation(currentTree, won);
         }
 
