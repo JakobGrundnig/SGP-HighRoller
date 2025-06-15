@@ -13,7 +13,24 @@ import at.ac.tuwien.ifs.sge.util.tree.Tree;
 /**
  * HighRoller is an AI agent that uses Monte Carlo Tree Search (MCTS) to play Risk.
  * It implements the UCT (Upper Confidence Bound for Trees) algorithm to make strategic decisions.
+ * 
+ * Key Features:
+ * - Adaptive strategy based on game position (ahead/behind)
+ * - Performance optimized metrics calculation
+ * - Dynamic attack potential evaluation
+ * - Continent control awareness
+ * 
  * The agent maintains a game tree of possible moves and uses simulation to evaluate their effectiveness.
+ * It employs a sophisticated evaluation system that considers:
+ * - Territory control
+ * - Troop strength
+ * - Continent bonuses
+ * - Attack potential
+ * 
+ * The strategy adapts based on the player's position:
+ * - When ahead: Focuses on aggressive attacks to finish the game
+ * - When behind: Prioritizes growth and scaling
+ * - When balanced: Uses a mixed strategy
  */
 public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A> {
     private static int INSTANCE_NR_COUNTER = 1;

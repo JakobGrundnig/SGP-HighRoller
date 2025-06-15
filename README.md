@@ -1,5 +1,11 @@
 # HighRoller - Risk Game AI
 
+## Made by:
+- Alexander Nestorov
+  - 12019871
+- Jakob Grundnig
+  - 12024006
+
 ## Overview
 HighRoller is an AI agent that uses Monte Carlo Tree Search (MCTS) to play Risk. It implements the UCT (Upper Confidence Bound for Trees) algorithm to make strategic decisions.
 

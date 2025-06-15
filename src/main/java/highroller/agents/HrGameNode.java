@@ -4,6 +4,27 @@ import at.ac.tuwien.ifs.sge.game.Game;
 import at.ac.tuwien.ifs.sge.util.node.GameNode;
 import java.util.Objects;
 
+/**
+ * HrGameNode represents a node in the MCTS game tree for the HighRoller agent.
+ * It extends the basic GameNode with additional functionality specific to Risk game evaluation.
+ * 
+ * Key Features:
+ * - Game state storage
+ * - Win/loss statistics tracking
+ * - Game state score caching
+ * - Efficient state comparison
+ * 
+ * The node maintains:
+ * - Current game state
+ * - Number of wins and plays
+ * - Cached game state score
+ * 
+ * The game state score is used to:
+ * - Evaluate move quality
+ * - Influence simulation outcomes
+ * - Guide tree traversal
+ * - Break ties in position evaluation
+ */
 public class HrGameNode<A> implements GameNode<A> {
 
     private Game<A, ?> game;

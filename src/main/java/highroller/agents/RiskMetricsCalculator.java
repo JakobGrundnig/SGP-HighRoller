@@ -12,8 +12,42 @@ import java.util.stream.Collectors;
 
 /**
  * RiskMetricsCalculator provides methods to evaluate game states and calculate various metrics
- * for Risk game AI decision making. It implements aggressive attack strategies and evaluates
- * overall game state quality.
+ * for Risk game AI decision making. It implements an adaptive strategy that changes based on
+ * the player's position in the game.
+ * 
+ * Key Features:
+ * - Dynamic weight adjustment based on game position
+ * - Performance optimized with extensive caching
+ * - Sophisticated attack potential evaluation
+ * - Continent control awareness
+ * 
+ * The calculator evaluates game states using four main metrics:
+ * 1. Territory Control (0.05-0.3 weight)
+ *    - Measures proportion of territories controlled
+ *    - Higher weight when behind
+ * 
+ * 2. Troop Strength (0.1-0.4 weight)
+ *    - Measures proportion of total troops
+ *    - Higher weight when behind
+ * 
+ * 3. Continent Control (0.05-0.2 weight)
+ *    - Evaluates progress towards continent bonuses
+ *    - Higher weight when behind
+ * 
+ * 4. Attack Potential (0.1-0.8 weight)
+ *    - Measures ability to make successful attacks
+ *    - Higher weight when ahead
+ * 
+ * Position Detection:
+ * - Significant Advantage: territoryRatio > 1.5 && troopRatio > 1.5
+ * - Behind in Troops: troopRatio < 0.8
+ * - Balanced: Neither of the above
+ * 
+ * Performance Optimizations:
+ * - Cached metrics and calculations
+ * - Pre-calculated player territories
+ * - Lazy initialization of expensive metrics
+ * - Efficient map operations
  */
 public class RiskMetricsCalculator {
 
@@ -279,10 +313,10 @@ public class RiskMetricsCalculator {
      * and attack potential while considering other strategic factors.
      * 
      * Metrics used:
-     * - Territory control (30%): Number of territories owned
-     * - Troop strength (30%): Total number of troops
-     * - Continent control (20%): Progress towards continent bonuses
-     * - Attack potential (20%): Ability to make successful attacks
+     * - Territory control
+     * - Troop strength
+     * - Continent control
+     * - Attack potential
      * 
      * @return A score between 0 and 1 indicating overall game state quality
      */

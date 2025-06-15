@@ -14,6 +14,24 @@ import java.util.concurrent.TimeUnit;
  * MCTSAgent provides the core Monte Carlo Tree Search functionality.
  * This class implements the UCT (Upper Confidence Bound for Trees) algorithm
  * and can be used by game-specific agents to make strategic decisions.
+ * 
+ * The MCTS algorithm consists of four main phases:
+ * 1. Selection: Traverses the tree using UCT formula to find promising nodes
+ * 2. Expansion: Adds child nodes to the selected leaf
+ * 3. Simulation: Performs random playouts with heuristic-based early moves
+ * 4. Backpropagation: Updates node statistics along the path
+ * 
+ * Key Features:
+ * - UCT-based tree traversal
+ * - Heuristic-guided simulations for early moves
+ * - Game state score influenced tie resolution
+ * - Performance optimized tree operations
+ * 
+ * The agent uses a combination of:
+ * - UCT formula for exploration/exploitation balance
+ * - Game state scoring for move evaluation
+ * - Random playouts for simulation
+ * - Adaptive strategy based on game position
  */
 public class MCTSAgent<G extends Game<A, ?>, A> {
     private static final int MAX_PRINT_THRESHOLD = 97;
