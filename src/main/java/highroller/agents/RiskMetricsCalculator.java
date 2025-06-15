@@ -200,7 +200,7 @@ public class RiskMetricsCalculator {
      * 
      * @return A score between 0 and 1 indicating continent control potential
      */
-    private double calculateContinentScore() {
+    public double calculateContinentScore() {
         if (continents.isEmpty()) {
             return 0.0;
         }
