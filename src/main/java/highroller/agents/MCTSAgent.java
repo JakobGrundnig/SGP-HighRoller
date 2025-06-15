@@ -3,12 +3,9 @@ package highroller.agents;
 import at.ac.tuwien.ifs.sge.game.Game;
 import at.ac.tuwien.ifs.sge.game.risk.board.Risk;
 import at.ac.tuwien.ifs.sge.game.risk.board.RiskAction;
-import at.ac.tuwien.ifs.sge.game.risk.board.RiskBoard;
-import at.ac.tuwien.ifs.sge.game.risk.board.RiskContinent;
-import at.ac.tuwien.ifs.sge.game.risk.board.RiskTerritory;
 import at.ac.tuwien.ifs.sge.util.Util;
-import at.ac.tuwien.ifs.sge.util.tree.Tree;
 import at.ac.tuwien.ifs.sge.util.tree.DoubleLinkedTree;
+import at.ac.tuwien.ifs.sge.util.tree.Tree;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -20,11 +17,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class MCTSAgent<G extends Game<A, ?>, A> {
     private static final int MAX_PRINT_THRESHOLD = 97;
-    private static final int MAX_SIMULATION_DEPTH = 100; // Increased depth for better simulation
-    private static final double EARLY_GAME_THRESHOLD = 0.3;
-    private static final double LATE_GAME_THRESHOLD = 0.7;
-    private static final int MAX_ACTIONS_TO_EVALUATE = 20; // Increased number of actions to evaluate
-    private static final double MIN_SIMULATION_QUALITY = 0.6; // Minimum quality threshold for simulations
+    private static final int MAX_SIMULATION_DEPTH = 50; // Prevent infinite simulations
     private final double exploitationConstant;
     private final Tree<HrGameNode<A>> tree;
     private final Random random;
@@ -141,14 +134,6 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
                     }
                 }
             } else {
-                // Use game state score in selection if available
-                if (tree.getNode().getGame() instanceof Risk) {
-                    children.sort((o1, o2) -> {
-                        double score1 = o1.getNode().hasGameStateScore() ? o1.getNode().getGameStateScore() : 0;
-                        double score2 = o2.getNode().hasGameStateScore() ? o2.getNode().getGameStateScore() : 0;
-                        return Double.compare(score2, score1);
-                    });
-                }
                 tree = Collections.max(children, gameTreeSelectionComparator);
             }
         }
@@ -165,35 +150,15 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
         if (tree.isLeaf() && !shouldStopComputation()) {
             Game<A, ?> game = tree.getNode().getGame();
             Set<A> possibleActions = game.getPossibleActions();
-            
-            // Sort actions by potential value for Risk games
-            if (game instanceof Risk) {
-                List<A> sortedActions = new ArrayList<>(possibleActions);
-                sortedActions.sort((a1, a2) -> {
-                    try {
-                        Game<A, ?> nextGame1 = game.doAction(a1);
-                        Game<A, ?> nextGame2 = game.doAction(a2);
-                        if (nextGame1 instanceof Risk && nextGame2 instanceof Risk) {
-                            RiskMetricsCalculator calc1 = new RiskMetricsCalculator((Risk) nextGame1, playerId);
-                            RiskMetricsCalculator calc2 = new RiskMetricsCalculator((Risk) nextGame2, playerId);
-                            return Double.compare(calc2.getGameStateScore(), calc1.getGameStateScore());
-                        }
-                        return 0;
-                    } catch (IllegalArgumentException e) {
-                        return 0;
-                    }
-                });
-                possibleActions = new LinkedHashSet<>(sortedActions);
-            }
-
             for (A possibleAction : possibleActions) {
                 if (shouldStopComputation()) break;
+                // Apply action to get next state
                 Game<A, ?> nextGame = game.doAction(possibleAction);
                 HrGameNode<A> childNode = new HrGameNode<>(nextGame);
                 tree.add(childNode);
 
                 // Compute and store game state score if it's a Risk game
-                if (nextGame instanceof Risk) {
+                if (nextGame instanceof Risk && !childNode.hasGameStateScore()) {
                     RiskMetricsCalculator calculator = new RiskMetricsCalculator((Risk) nextGame, playerId);
                     childNode.setGameStateScore(calculator.getGameStateScore());
                 }
@@ -216,13 +181,6 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
         if (simulationsDone < simulationsAtLeast && !shouldStopComputation(buffer)) {
             return simulation(tree);
         }
-
-        // Check simulation quality
-        double quality = calculateSimulationQuality(tree);
-        if (quality < MIN_SIMULATION_QUALITY && !shouldStopComputation(buffer)) {
-            return simulation(tree);
-        }
-
         return simulation(tree);
     }
 
@@ -236,13 +194,6 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
 
         Game<A, ?> game = tree.getNode().getGame();
         int depth = 0;
-        int totalTerritories = game instanceof Risk ? ((Risk) game).getBoard().getTerritories().size() : 0;
-        int currentTerritories = game instanceof Risk ? 
-            (int) ((Risk) game).getBoard().getTerritories().values().stream()
-                .filter(t -> t.getOccupantPlayerId() == playerId)
-                .count() : 0;
-        
-        double gameProgress = totalTerritories > 0 ? (double) currentTerritories / totalTerritories : 0.0;
 
         while (!game.isGameOver() && depth < MAX_SIMULATION_DEPTH) {
             if (shouldStopComputation()) return false;
@@ -251,9 +202,7 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
 
             // Skip inactive players
             if (currentPlayer < 0) {
-                A action = game.determineNextAction();
-                if (action == null) break;
-                game = game.doAction(action);
+                game = game.doAction();
                 depth++;
                 continue;
             }
@@ -262,183 +211,17 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
             if (actions.isEmpty()) break;
 
             A selectedAction;
-            if (game instanceof Risk) {
-                // Different strategies based on game phase
-                if (gameProgress < EARLY_GAME_THRESHOLD) {
-                    // Early game: Focus on territory control and continent bonuses
-                    selectedAction = selectEarlyGameAction((Risk) game, actions);
-                } else if (gameProgress > LATE_GAME_THRESHOLD) {
-                    // Late game: Focus on eliminating opponents and securing victory
-                    selectedAction = selectLateGameAction((Risk) game, actions);
-                } else {
-                    // Mid game: Balance between early and late game strategies
-                    selectedAction = selectMidGameAction((Risk) game, actions);
-                }
+            if (game instanceof Risk && depth < 10) {
+                selectedAction = selectActionWithHighestGameStateScore((Risk) game, actions);
             } else {
                 selectedAction = Util.selectRandom(actions, random);
             }
 
-            // Validate action before executing
-            if (selectedAction == null || !game.isValidAction(selectedAction)) {
-                break;
-            }
-
-            try {
-                game = game.doAction(selectedAction);
-                // Update game progress
-                if (game instanceof Risk) {
-                    currentTerritories = (int) ((Risk) game).getBoard().getTerritories().values().stream()
-                        .filter(t -> t.getOccupantPlayerId() == playerId)
-                        .count();
-                    gameProgress = (double) currentTerritories / totalTerritories;
-                }
-            } catch (IllegalArgumentException e) {
-                break;
-            }
+            game = game.doAction(selectedAction);
             depth++;
         }
 
         return hasWon(game);
-    }
-
-    private double calculateSimulationQuality(Tree<HrGameNode<A>> tree) {
-        if (tree.getNode().getPlays() == 0) return 0.0;
-        return (double) tree.getNode().getWins() / tree.getNode().getPlays();
-    }
-
-    private A selectEarlyGameAction(Risk game, Set<A> actions) {
-        A bestAction = null;
-        double bestScore = Double.NEGATIVE_INFINITY;
-        
-        List<A> actionList = new ArrayList<>(actions);
-        Collections.shuffle(actionList, random);
-        int actionsToEvaluate = Math.min(MAX_ACTIONS_TO_EVALUATE, actionList.size());
-
-        for (int i = 0; i < actionsToEvaluate; i++) {
-            A action = actionList.get(i);
-            if (!game.isValidAction((RiskAction) action)) continue;
-
-            try {
-                Risk nextGame = (Risk) game.doAction((RiskAction) action);
-                RiskMetricsCalculator calculator = new RiskMetricsCalculator(nextGame, playerId);
-                
-                // Enhanced early game scoring
-                double territoryScore = (double) calculator.getTerritoryCount() / nextGame.getBoard().getTerritories().size();
-                double troopScore = (double) calculator.getTotalTroopStrength() / calculator.getTotalGameTroops();
-                double continentScore = calculator.calculateContinentScore();
-                double attackPotential = calculator.getOverallAttackPotential();
-                
-                // Weight factors based on game state
-                double territoryWeight = 0.4;
-                double continentWeight = 0.3;
-                double troopWeight = 0.2;
-                double attackWeight = 0.1;
-                
-                double score = territoryScore * territoryWeight +
-                             continentScore * continentWeight +
-                             troopScore * troopWeight +
-                             attackPotential * attackWeight;
-                
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestAction = action;
-                }
-            } catch (IllegalArgumentException e) {
-                continue;
-            }
-        }
-
-        return bestAction != null ? bestAction : Util.selectRandom(actions, random);
-    }
-
-    private A selectMidGameAction(Risk game, Set<A> actions) {
-        A bestAction = null;
-        double bestScore = Double.NEGATIVE_INFINITY;
-        
-        List<A> actionList = new ArrayList<>(actions);
-        Collections.shuffle(actionList, random);
-        int actionsToEvaluate = Math.min(MAX_ACTIONS_TO_EVALUATE, actionList.size());
-
-        for (int i = 0; i < actionsToEvaluate; i++) {
-            A action = actionList.get(i);
-            if (!game.isValidAction((RiskAction) action)) continue;
-
-            try {
-                Risk nextGame = (Risk) game.doAction((RiskAction) action);
-                RiskMetricsCalculator calculator = new RiskMetricsCalculator(nextGame, playerId);
-                
-                // Enhanced mid game scoring
-                double territoryScore = (double) calculator.getTerritoryCount() / nextGame.getBoard().getTerritories().size();
-                double troopScore = (double) calculator.getTotalTroopStrength() / calculator.getTotalGameTroops();
-                double attackPotential = calculator.getOverallAttackPotential();
-                double continentScore = calculator.calculateContinentScore();
-                
-                // Weight factors based on game state
-                double territoryWeight = 0.3;
-                double troopWeight = 0.3;
-                double attackWeight = 0.3;
-                double continentWeight = 0.1;
-                
-                double score = territoryScore * territoryWeight +
-                             troopScore * troopWeight +
-                             attackPotential * attackWeight +
-                             continentScore * continentWeight;
-                
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestAction = action;
-                }
-            } catch (IllegalArgumentException e) {
-                continue;
-            }
-        }
-
-        return bestAction != null ? bestAction : Util.selectRandom(actions, random);
-    }
-
-    private A selectLateGameAction(Risk game, Set<A> actions) {
-        A bestAction = null;
-        double bestScore = Double.NEGATIVE_INFINITY;
-        
-        List<A> actionList = new ArrayList<>(actions);
-        Collections.shuffle(actionList, random);
-        int actionsToEvaluate = Math.min(MAX_ACTIONS_TO_EVALUATE, actionList.size());
-
-        for (int i = 0; i < actionsToEvaluate; i++) {
-            A action = actionList.get(i);
-            if (!game.isValidAction((RiskAction) action)) continue;
-
-            try {
-                Risk nextGame = (Risk) game.doAction((RiskAction) action);
-                RiskMetricsCalculator calculator = new RiskMetricsCalculator(nextGame, playerId);
-                
-                // Enhanced late game scoring
-                double territoryScore = (double) calculator.getTerritoryCount() / nextGame.getBoard().getTerritories().size();
-                double troopScore = (double) calculator.getTotalTroopStrength() / calculator.getTotalGameTroops();
-                double attackPotential = calculator.getOverallAttackPotential();
-                double continentScore = calculator.calculateContinentScore();
-                
-                // Weight factors based on game state
-                double territoryWeight = 0.3;
-                double troopWeight = 0.2;
-                double attackWeight = 0.4;
-                double continentWeight = 0.1;
-                
-                double score = territoryScore * territoryWeight +
-                             troopScore * troopWeight +
-                             attackPotential * attackWeight +
-                             continentScore * continentWeight;
-                
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestAction = action;
-                }
-            } catch (IllegalArgumentException e) {
-                continue;
-            }
-        }
-
-        return bestAction != null ? bestAction : Util.selectRandom(actions, random);
     }
 
     /**
@@ -478,6 +261,37 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
             }
         }
     }
+    private A selectActionWithHighestGameStateScore(Risk game, Set<A> actions) {
+        A bestAction = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+
+        double totalVisits = actions.size(); // initial 1 visit per action
+        double logTotalVisits = Math.log(totalVisits);
+
+        for (A action : actions) {
+            // Generate the resulting game state
+            Risk nextGame = (Risk) game.doAction((RiskAction) action);
+
+            // Use or initialize node with game state score
+            HrGameNode<RiskAction> node = new HrGameNode<>(nextGame);
+            if (!node.hasGameStateScore()) {
+                RiskMetricsCalculator calculator = new RiskMetricsCalculator(nextGame, playerId);
+                node.setGameStateScore(calculator.getGameStateScore());
+            }
+
+            double exploitation = node.getGameStateScore();
+            double exploration = exploitationConstant * Math.sqrt(logTotalVisits); // visits = 1
+            double score = exploitation + exploration;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestAction = action;
+            }
+        }
+
+        return bestAction;
+    }
+
 
     /**
      * Calculates the Upper Confidence Bound (UCB) value for a node.
