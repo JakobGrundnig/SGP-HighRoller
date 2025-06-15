@@ -56,7 +56,7 @@ public class HighRoller<G extends Game<A, ?>, A> extends AbstractGameAgent<G, A>
 
     @Override
     public A computeNextAction(G game, long computationTime, TimeUnit timeUnit) {
-        log.debug("computeNextAction");
+        //log.debug("computeNextAction");
         super.setTimers(computationTime, timeUnit);
         mctsAgent.setTimers(computationTime, timeUnit);
 

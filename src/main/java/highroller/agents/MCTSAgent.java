@@ -202,7 +202,9 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
 
             // Skip inactive players
             if (currentPlayer < 0) {
-                game = game.doAction();
+                A action = game.determineNextAction();
+                if (action == null) break;
+                game = game.doAction(action);
                 depth++;
                 continue;
             }
@@ -217,7 +219,17 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
                 selectedAction = Util.selectRandom(actions, random);
             }
 
-            game = game.doAction(selectedAction);
+            // Validate action before executing
+            if (selectedAction == null || !game.isValidAction(selectedAction)) {
+                break;
+            }
+
+            try {
+                game = game.doAction(selectedAction);
+            } catch (IllegalArgumentException e) {
+                // If action is invalid, break the simulation
+                break;
+            }
             depth++;
         }
 
@@ -261,6 +273,7 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
             }
         }
     }
+
     private A selectActionWithHighestGameStateScore(Risk game, Set<A> actions) {
         A bestAction = null;
         double bestScore = Double.NEGATIVE_INFINITY;
@@ -269,29 +282,35 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
         double logTotalVisits = Math.log(totalVisits);
 
         for (A action : actions) {
-            // Generate the resulting game state
-            Risk nextGame = (Risk) game.doAction((RiskAction) action);
+            if (!game.isValidAction((RiskAction) action)) continue;
 
-            // Use or initialize node with game state score
-            HrGameNode<RiskAction> node = new HrGameNode<>(nextGame);
-            if (!node.hasGameStateScore()) {
-                RiskMetricsCalculator calculator = new RiskMetricsCalculator(nextGame, playerId);
-                node.setGameStateScore(calculator.getGameStateScore());
-            }
+            try {
+                // Generate the resulting game state
+                Risk nextGame = (Risk) game.doAction((RiskAction) action);
 
-            double exploitation = node.getGameStateScore();
-            double exploration = exploitationConstant * Math.sqrt(logTotalVisits); // visits = 1
-            double score = exploitation + exploration;
+                // Use or initialize node with game state score
+                HrGameNode<RiskAction> node = new HrGameNode<>(nextGame);
+                if (!node.hasGameStateScore()) {
+                    RiskMetricsCalculator calculator = new RiskMetricsCalculator(nextGame, playerId);
+                    node.setGameStateScore(calculator.getGameStateScore());
+                }
 
-            if (score > bestScore) {
-                bestScore = score;
-                bestAction = action;
+                double exploitation = node.getGameStateScore();
+                double exploration = exploitationConstant * Math.sqrt(logTotalVisits); // visits = 1
+                double score = exploitation + exploration;
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestAction = action;
+                }
+            } catch (IllegalArgumentException e) {
+                // Skip invalid actions
+                continue;
             }
         }
 
         return bestAction;
     }
-
 
     /**
      * Calculates the Upper Confidence Bound (UCB) value for a node.
