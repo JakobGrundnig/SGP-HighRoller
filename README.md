@@ -116,12 +116,12 @@ The GameStateScore is used in the MCTS simulation to:
 ### Running a Match
 To run a match between two agents:
 ```bash
-java -jar sge-1.0.7-exe.jar match --file=sge-risk-1.0.7-exe.jar --directory=agents --agent HighRoller RandomAgent --debug --c=2
+java -jar sge-1.0.7-exe.jar match --file=sge-risk-1.0.7-exe.jar --directory=agents --agent HighRoller RandomAgent
 ```
 
 ### Building
 ```bash
-mvn clean package
+./gradlew build
 ```
 
 ## Links
