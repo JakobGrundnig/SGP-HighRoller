@@ -242,7 +242,20 @@ public class MCTSAgent<G extends Game<A, ?>, A> {
         boolean win = score == 1D;
         boolean tie = score > 0;
 
-        win = win || (tie && random.nextBoolean());
+        if (tie && !win) {
+            // Get the game state score to influence the probability
+            HrGameNode<A> node = new HrGameNode<>(game);
+            if (!node.hasGameStateScore()) {
+                RiskMetricsCalculator calculator = new RiskMetricsCalculator((Risk) game, playerId);
+                node.setGameStateScore(calculator.getGameStateScore());
+            }
+            
+            // Use gameStateScore to bias the random decision
+            // Higher gameStateScore means higher probability of winning
+            double gameStateScore = node.getGameStateScore();
+            return random.nextDouble() < gameStateScore;
+        }
+        
         return win;
     }
 
